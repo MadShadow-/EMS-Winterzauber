@@ -6,15 +6,14 @@
 -- *                                                                                              *
 -- *                                                                                              *
 -- ************************************************************************************************
- 
- r = Framework.RestartMap
+
 EMS_CustomMapConfig =
 {
 	-- ********************************************************************************************
 	-- * Configuration File Version
 	-- * A version check will make sure every player has the same version of the configuration file
 	-- ********************************************************************************************
-	Version = 1.1,
+	Version = 1.2,
  
 	-- ********************************************************************************************
 	-- * Callback_OnMapStart
@@ -64,6 +63,14 @@ EMS_CustomMapConfig =
 			Logic.HurtEntity(GetEntityId("r"..i), 400);
 		end
 		
+		local ViewCenter;
+		for i = 1,4 do
+			ViewCenter = Logic.CreateEntity(Entities.XD_ScriptEntity,  6860, 38380+i, 0, i)
+			Logic.SetEntityExplorationRange(ViewCenter, 7)
+			ViewCenter = Logic.CreateEntity(Entities.XD_ScriptEntity, 70099, 38489+i, 0, i)
+			Logic.SetEntityExplorationRange(ViewCenter, 7)
+		end
+		
 		Trigger.RequestTrigger( Events.LOGIC_EVENT_ENTITY_CREATED, "", "WT_MineFiller", 1);
 	end,
  
@@ -76,9 +83,7 @@ EMS_CustomMapConfig =
 		WT.StartWeather();
 		WT.SetupDiplomacy();
 		Logic.PlayerSetIsHumanFlag( 5, 1);
-		Logic.PlayerSetPlayerColor( 5, 0, 255, 0);
 		Logic.PlayerSetIsHumanFlag( 6, 1);
-		Logic.PlayerSetPlayerColor( 6, 255, 255, 255);
 		WT.SuddenDeathTimeCounter = 60*60;
 		StartSimpleJob("WT_SuddenDeathTimer");
 		StartSimpleJob("WT_MercernaryRefiller");
@@ -769,7 +774,7 @@ function WT.GetCostString(_costs, _playerId)
 		else
 			color = "@color:255,255,255";
 		end
-		str = str .. WT.ResourceNames[_costs[i][1]] .. " : ".. color .. " " .. _costs[i][2] .. " @cr ";
+		str = str .. WT.ResourceNames[_costs[i][1]] .. " : ".. color .. " " .. _costs[i][2] .. " @cr @color:255,255,255 ";
 	end
 	return str;
 end
@@ -823,6 +828,21 @@ function WT.UpdateOptionTooltip(_index)
 	XGUIEng.ShowWidget("EMSMAWTooltip", 1);
 	WT.SecondTooltipVisible = true;
 	XGUIEng.SetText("EMSMAWTooltip", WT.GetCostString(WT.GetOptionCosts(_index, GUI.GetPlayerID()), GUI.GetPlayerID()));
+	if _index == 6 then
+		local pId = GUI.GetPlayerID();
+		local ai = WT.GetPlayersAI(pId);
+		if WT.AI[ai].UpgradeLevel == 2 then
+			if WT.PlayerHQLevels[pId] == 1 then
+				XGUIEng.SetText("EMSMAWTooltip2", WT.TextTable.NeedsHQ2);
+				return;
+			end
+		elseif WT.AI[ai].UpgradeLevel == 3 then
+			if WT.PlayerHQLevels[pId] == 2 then
+				XGUIEng.SetText("EMSMAWTooltip2", WT.TextTable.NeedsHQ3);
+				return;
+			end
+		end
+	end
 	XGUIEng.SetText("EMSMAWTooltip2", WT.TextTable.OT[_index]);
 end
 
@@ -1311,6 +1331,15 @@ if WT.Language == "de" then
 		
 		WinHead1 = "Hurra!",
 		WinHead2 = "Oh Nein!",
+		
+		Team1 = " und ",
+		Team2 = " haben einen Leuchtturm erobert!",
+		
+		Chest1 = " hat die Schatztruhe von ",
+		Chest2 = " geöffnet!",
+		
+		NeedsHQ2 = "Benötigt Festung!",
+		NeedsHQ3 = "Benötigt Zitadelle!",
 	}
 else
 	WT.TextTable = {
@@ -1328,21 +1357,30 @@ else
 			"Improves armor (Armor +2)!",
 			"Improves attack damage(damage +2)!",
 			"Reduces recruiting time by "..WT.RespawnTimerDecrease.." seconds!",
-			"Improves unit!",
+			"Upgrade unit level!",
 			"Hebt die Armee eures Verbündeten aus (einmalig)",
 		},
 		
-		Remove = "Entfernt diese Einheit von der Rekrutierung!",
-		NotEnoughResources = "Nicht genügend Rohstoffe vorhanden!",
-		ArmyLimitReached = "Maximale Armeegröße erreicht!",
+		Remove = "Removes this unit from beeing recruited!",
+		NotEnoughResources = "Not enough resources!",
+		ArmyLimitReached = "Maximum army size reached!",
 		
-		OtherTeamOwnsSpawn = "Das andere Team hat diesen Punkt bereits besetzt!",
-		Win1 = "Der Weihnachtsbaum ist gefallen! ",
-		Win2 = " und ",
-		Win3 = " haben diese Runde für sich entschieden! Herzlichen Glückwunsch an die beiden!",
+		OtherTeamOwnsSpawn = "The other Team has already blocked the next placement!",
+		Win1 = "The Christmas tree has fallen! ",
+		Win2 = " and ",
+		Win3 = " have won this game! Congratulations!",
 		
 		WinHead1 = "Hurra!",
-		WinHead2 = "Oh Nein!",
+		WinHead2 = "Oh No!",
+		
+		Team1 = " and ",
+		Team2 = " have conquered a tower!",
+		
+		Chest1 = " opened ",
+		Chest2 = " chest!",
+		
+		NeedsHQ2 = "Needs Headquarters Level 2!",
+		NeedsHQ3 = "Needs Headquarters Level 3!",
 	}
 end
 
@@ -1400,7 +1438,6 @@ function WT_TowerController()
 						end
 					end
 				end
-				LuaDebugger.Log("Team1 "..tostring(isTeam1).." and Team2 " ..tostring(isTeam2));
 				
 				-- enemy AI
 				entities = {Logic.GetPlayerEntitiesInArea(7, 0, WT.TowerSpawns[i][1], WT.TowerSpawns[i][2], range, 1)}
@@ -1409,8 +1446,10 @@ function WT_TowerController()
 				end
 				
 				if isTeam1 and not isTeam2 and not isTeam3 then
+					Message("@color:255,125,0 " .. UserTool_GetPlayerName(1) .. WT.TextTable.Team1 .. UserTool_GetPlayerName(2) ..  WT.TextTable.Team2);
 					WT.SpawnTower(i, 1, WT.TowerState.Attackable, Entities.CB_LighthouseActivated);
 				elseif not isTeam1 and isTeam2 and not isTeam3 then
+					Message("@color:255,125,0 " .. UserTool_GetPlayerName(3) .. WT.TextTable.Team1 .. UserTool_GetPlayerName(4) ..  WT.TextTable.Team2);
 					WT.SpawnTower(i, 3, WT.TowerState.Attackable, Entities.CB_LighthouseActivated);
 				end
 			end
@@ -1780,8 +1819,51 @@ function WT.SetupColorMapping()
 	if ai2Color == 0 then
 		ai2Color = 13;
 	end
-	Display.SetPlayerColorMapping(5, ai1Color);
-	Display.SetPlayerColorMapping(6, ai2Color);
+	
+	local colors = {}
+	for i = 1,4 do
+		colors[XNetwork.GameInformation_GetLogicPlayerColor(i)] = true;
+	end
+	
+	-- enemy ai color not used
+	colors[14] = true;
+	colors[7] = true;
+
+	-- if default colors green and white are not used by players-> use them
+	if not colors[9] then
+		ai1Color = 9;
+		colors[9] = true;
+	elseif colors[ai1Color] then
+		-- set aiColor also used by player
+		for i = 1, 16 do
+			if not colors[i] then
+				ai1Color = i;
+				colors[i] = true;
+				break;
+			end
+		end
+	end
+	if not colors[13] then
+		ai2Color = 13;
+	elseif colors[ai2Color] then
+		-- set aiColor also used by player
+		for i = 1, 16 do
+			if not colors[i] then
+				ai2Color = i;
+			end
+		end
+	end
+
+	-- set ingame colors
+	Display.SetPlayerColorMapping(WT.AI1, ai1Color);
+	Display.SetPlayerColorMapping(WT.AI2, ai2Color);
+	
+	-- stati colors
+	local r,g,b = GUI.GetPlayerColor(WT.AI1);
+	Logic.PlayerSetPlayerColor(WT.AI1, r, g, b);
+	r,g,b = GUI.GetPlayerColor(WT.AI2);
+	Logic.PlayerSetPlayerColor(WT.AI2, r, g, b);
+	
 	Display.SetPlayerColorMapping(7, 14);
 	Display.SetPlayerColorMapping(8, 7);
 	
@@ -2069,7 +2151,7 @@ function WT_HurtTowers()
 			if IsAlive(WT.DefendingTowers[i]) then
 				allDead = false;
 				Logic.SetEntityInvulnerabilityFlag(WT.DefendingTowers[i], 0);
-				Logic.HurtEntity(WT.DefendingTowers[i], 50);
+				Logic.HurtEntity(WT.DefendingTowers[i], 10);
 				if Logic.GetEntityHealth(WT.DefendingTowers[i]) <= 0 then
 					Logic.SetEntityInvulnerabilityFlag(WT.DefendingTowers[i], 1);
 				end
@@ -2214,6 +2296,7 @@ function WT_ChestControl()
 			for j = 1, 4 do
 				entities = {Logic.GetPlayerEntitiesInArea(j, 0, pos.X, pos.Y, 1000, 1)};
 				if entities[1] > 0 then
+					Message("@color:0,255,255 " .. UserTool_GetPlayerName(j) .. WT.TextTable.Chest1 .. UserTool_GetPlayerName(i) .. WT.TextTable.Chest2);
 					AddGold(j, 1000);
 					WT.ChestsDestroyed[i] = true;
 					ReplaceEntity("ch"..i, Entities.XD_ChestOpen);
