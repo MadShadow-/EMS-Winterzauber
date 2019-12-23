@@ -1551,12 +1551,12 @@ function WT.UpdateVillagePlacesProvided(_ai, _level)
 	elseif _level == 2 then
 		for i = p1,p2 do
 			-- create first
-			if not IsAlive(WT.VillageCenterProviders[p1][1]) then
+			if not IsAlive(WT.VillageCenterProviders[i][1]) then
 				WT.VillageCenterProviders[i][1] = Logic.CreateEntity(Entities.CB_SteamMashine, 500, 500, 0, i);
 				Logic.SetModelAndAnimSet( WT.VillageCenterProviders[i][1], Models.XD_Rock3);
 			end
 			-- create second
-			if not IsAlive(WT.VillageCenterProviders[p1][2]) then
+			if not IsAlive(WT.VillageCenterProviders[i][2]) then
 				WT.VillageCenterProviders[i][2] = Logic.CreateEntity(Entities.CB_SteamMashine, 500, 500, 0, i);
 				Logic.SetModelAndAnimSet( WT.VillageCenterProviders[i][2], Models.XD_Rock3);
 			end
