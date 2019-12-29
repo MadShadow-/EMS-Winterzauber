@@ -13,7 +13,7 @@ EMS_CustomMapConfig =
 	-- * Configuration File Version
 	-- * A version check will make sure every player has the same version of the configuration file
 	-- ********************************************************************************************
-	Version = 1.3,
+	Version = 1.4,
  
 	-- ********************************************************************************************
 	-- * Callback_OnMapStart
@@ -1474,7 +1474,7 @@ function WT.SpawnTower(_towerId, _playerId, _towerState, _entity)
 		player = Logic.EntityGetPlayer(WT.Towers[i]);
 		if player == 1 then
 			towersTeam1 = towersTeam1 + 1;
-		else
+		elseif player == 3 then
 			towersTeam2 = towersTeam2 + 1;
 		end
 	end
