@@ -72,6 +72,9 @@ EMS_CustomMapConfig =
 		end
 		
 		Trigger.RequestTrigger( Events.LOGIC_EVENT_ENTITY_CREATED, "", "WT_MineFiller", 1);
+        
+        Script.Load("maps\\user\\EMS\\ObserverInfo\\ObserverInfo.lua")
+        ObserverInfo.InitIfLocalSpecForAllPlayers()
 	end,
  
  
