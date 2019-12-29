@@ -19,50 +19,71 @@ function Sync.Init()
 	Sync.Whitelist = {
 	};
 	
-	-- numOfTributes determines actions at the same time
-	local numberOfTributes = 150;
-	Sync.Tributes = {}
-	for playerId = 1,8 do
-		for i = 1, numberOfTributes do
-			Sync.CreateNewTribut(playerId)
+	if not CNetwork then
+		-- numOfTributes determines actions at the same time
+		local numberOfTributes = 150;
+		Sync.Tributes = {}
+		for playerId = 1,8 do
+			for i = 1, numberOfTributes do
+				Sync.CreateNewTribut(playerId)
+			end
 		end
 	end
 	
 	-- this overwrite should be the last one, to overwrite this method
 	-- so no one can accidentely filter out sync messages
-	Sync.MPGame_ApplicationCallback_ReceivedChatMessage = MPGame_ApplicationCallback_ReceivedChatMessage;
-	MPGame_ApplicationCallback_ReceivedChatMessage = function( _msg, _alliedOnly, _senderID )
-		if string.find(_msg, Sync.PrepareChar) == 1 then
-			Sync.OnPrepareMessageArrived(string.sub(_msg, 2))
-			return
-		elseif string.find(_msg, Sync.AcknowledgeChar) == 1 then
-			Sync.OnAcknowledgeMessageArrived(string.sub(_msg, 2), _senderID)
-			return
-		elseif string.find(_msg, Sync.NoSyncChar) == 1 then
-			Sync.ExecuteFunctionByString(string.sub(_msg,2))
-			return
+	if CNetwork then
+		Sync.ApplicationCallback_ReceivedChatMessageRaw = ApplicationCallback_ReceivedChatMessageRaw
+		ApplicationCallback_ReceivedChatMessageRaw = function(_name, _msg, _color, _allied, _sender)
+			if string.find(_msg, Sync.PrepareChar) == 1 then
+				Sync.OnPrepareMessageArrived(string.sub(_msg, 2))
+				return true;
+			elseif string.find(_msg, Sync.AcknowledgeChar) == 1 then
+				Sync.OnAcknowledgeMessageArrived(string.sub(_msg, 2), _senderID)
+				return true;
+			elseif string.find(_msg, Sync.NoSyncChar) == 1 then
+				Sync.ExecuteFunctionByString(string.sub(_msg,2))
+				return true;
+			end
+			return Sync.ApplicationCallback_ReceivedChatMessageRaw(_name, _msg, _color, _allied, _sender)
 		end
-		Sync.MPGame_ApplicationCallback_ReceivedChatMessage(_msg, _alliedOnly, _senderID);
+	else
+		Sync.MPGame_ApplicationCallback_ReceivedChatMessage = MPGame_ApplicationCallback_ReceivedChatMessage;
+		MPGame_ApplicationCallback_ReceivedChatMessage = function( _msg, _alliedOnly, _senderID )
+			if string.find(_msg, Sync.PrepareChar) == 1 then
+				Sync.OnPrepareMessageArrived(string.sub(_msg, 2))
+				return
+			elseif string.find(_msg, Sync.AcknowledgeChar) == 1 then
+				Sync.OnAcknowledgeMessageArrived(string.sub(_msg, 2), _senderID)
+				return
+			elseif string.find(_msg, Sync.NoSyncChar) == 1 then
+				Sync.ExecuteFunctionByString(string.sub(_msg,2))
+				return
+			end
+			Sync.MPGame_ApplicationCallback_ReceivedChatMessage(_msg, _alliedOnly, _senderID);
+		end
 	end
 	
-	Sync.Call = function(_func, ...)
-		local player = GUI.GetPlayerID()
-		local id = Sync.GetFreeTributeId(player)
-		if not id then
-			Message("Sync Failed: No Tribute Id's left")
-			return
+	if not CNetwork then
+		Sync.Call = function(_func, ...)
+			local player = GUI.GetPlayerID()
+			local id = Sync.GetFreeTributeId(player)
+			if not id then
+				Message("Sync Failed: No Tribute Id's left")
+				return
+			end
+			Sync.Tributes[id].Used = true
+			Sync.Tributes[id].AckData = {}
+			for i = 1, 8 do
+				Sync.Tributes[id].AckData[i] = ((XNetwork.GameInformation_IsHumanPlayerAttachedToPlayerID(i) ~= 1) or GUI.GetPlayerID() == i or (XNetwork.GameInformation_IsHumanPlayerThatLeftAttachedToPlayerID(i) == 1))
+			end
+			local fs = Sync.CreateFunctionString( _func, unpack(arg))
+			Sync.OverwriteTributeCallback(id, fs)
+			Sync.Send(Sync.PrepareChar..id..fs);
 		end
-		Sync.Tributes[id].Used = true
-		Sync.Tributes[id].AckData = {}
-		for i = 1, 8 do
-			Sync.Tributes[id].AckData[i] = ((XNetwork.GameInformation_IsHumanPlayerAttachedToPlayerID(i) ~= 1) or GUI.GetPlayerID() == i or (XNetwork.GameInformation_IsHumanPlayerThatLeftAttachedToPlayerID(i) == 1))
-		end
-		local fs = Sync.CreateFunctionString( _func, unpack(arg))
-		Sync.OverwriteTributeCallback(id, fs)
-		Sync.Send(Sync.PrepareChar..id..fs);
 	end
 	Sync.CallNoSync = function(_func, ...)
-		Sync.Send(nosync .. Sync.CreateFunctionString(_func, unpack(arg)))
+		Sync.Send(Sync.NoSyncChar .. Sync.CreateFunctionString(_func, unpack(arg)))
 	end
 end
 function Sync.Call(_func, ...)
