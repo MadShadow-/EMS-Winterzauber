@@ -185,10 +185,11 @@ function ObserverInfo.GetBuildingTypeName(ty)
 end
 
 function ObserverInfo.GetResearchTextLine(r)
-	if IsDead(r.id) or Logic.GetTechnologyResearchedAtBuilding(r.id)~=r.tech then
+	if IsDead(r.id) or Logic.GetTechnologyResearchedAtBuilding(r.id)~=r.tech or r.cancelled then
 		if r.timer+15<Logic.GetTime() then
 			return "", true
 		end
+		r.cancelled = true
 		return " @cr "..ObserverInfo.GetPlayerColoredName(r.player)..ObserverInfo.GetTechName(r.tech)..(r.progressActive and " cancelled" or " 0%")
 	end
 	r.progressActive = true
@@ -210,10 +211,11 @@ end
 
 function ObserverInfo.GetUpgradeLine(r)
 	if r.build then
-		if IsDead(r.id) then
+		if IsDead(r.id) or r.cancelled then
 			if r.timer+15<Logic.GetTime() then
 				return "", true
 			end
+			r.cancelled = true
 			return " @cr "..ObserverInfo.GetPlayerColoredName(r.player)..ObserverInfo.GetBuildingTypeName(r.type).." cancelled"
 		end
 		r.timer = Logic.GetTime()
@@ -221,10 +223,11 @@ function ObserverInfo.GetUpgradeLine(r)
 		prog = math.floor(prog*100)
 		return " @cr "..ObserverInfo.GetPlayerColoredName(r.player)..ObserverInfo.GetBuildingTypeName(r.type).." "..prog.."%"
 	else
-		if IsDead(r.id) or Logic.GetRemainingUpgradeTimeForBuilding(r.id)==Logic.GetTotalUpgradeTimeForBuilding(r.id) then
+		if IsDead(r.id) or Logic.GetRemainingUpgradeTimeForBuilding(r.id)==Logic.GetTotalUpgradeTimeForBuilding(r.id) or r.cancelled then
 			if r.timer+15<Logic.GetTime() then
 				return "", true
 			end
+			r.cancelled = true
 			return " @cr "..ObserverInfo.GetPlayerColoredName(r.player)..ObserverInfo.GetBuildingTypeName(r.type).." cancelled"
 		end
 		r.timer = Logic.GetTime()
